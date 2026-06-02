@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QueryMind — Natural Language Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/atom-one-light.min.css"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-text">QueryMind</span>
+        </a>
+        <nav class="header-nav" aria-label="Primary">
+          <span class="nav-item">Energy Analytics</span>
+          <span id="healthBadge" class="health-badge health-badge--loading">Checking data platform…</span>
+        </nav>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-inner">
+        <p class="eyebrow">Technology &amp; Innovation</p>
+        <h1>Natural language analytics for well production data</h1>
+        <p class="hero-lead">
+          Ask business questions in plain English. QueryMind generates and executes analytics
+          on your production dataset — no SQL or PySpark required.
+        </p>
+      </div>
+    </section>
+
+    <main class="main-content">
+      <div class="content-grid">
+        <section class="card card--primary" id="querySection">
+          <div class="card-header">
+            <h2 class="card-title">Ask your question</h2>
+            <p class="card-subtitle">Describe what you want to learn from well production data.</p>
+          </div>
+          <label class="sr-only" for="questionInput">Your question</label>
+          <textarea
+            id="questionInput"
+            rows="4"
+            placeholder="e.g. Show monthly production trend for Permian wells"
+          ></textarea>
+          <div class="actions">
+            <button id="runBtn" class="btn btn-primary" type="button">Run Query</button>
+            <span id="statusText" class="status" role="status" aria-live="polite"></span>
+          </div>
+        </section>
+
+        <section class="card card--data">
+          <div class="card-header">
+            <h2 class="card-title">Data import &amp; export</h2>
+            <p class="card-subtitle">
+              Import a wells CSV (columns: well_id, month, production_bbl, field, operator, depth_ft)
+              or export your latest results.
+            </p>
+          </div>
+          <div class="data-actions">
+            <label class="file-picker">
+              <input id="csvFileInput" type="file" accept=".csv,text/csv" />
+              <span class="btn btn-secondary">Choose CSV file</span>
+            </label>
+            <button id="importCsvBtn" class="btn btn-secondary" type="button" disabled>
+              Import CSV
+            </button>
+            <a class="btn btn-link" href="/export/template">Download template</a>
+          </div>
+          <p id="importStatus" class="import-status" role="status"></p>
+        </section>
+
+        <section class="card card--history" aria-label="Recent queries">
+          <div class="card-header">
+            <h2 class="card-title">Recent queries</h2>
+            <p class="card-subtitle">Click a past question to load it again.</p>
+          </div>
+          <ul id="historyList" class="history-rail">
+            <li class="history-empty">No queries yet — run your first question above.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Example questions</h2>
+            <p class="card-subtitle">Click to try a demo query instantly.</p>
+          </div>
+          <div id="exampleChips" class="chips">
+            <button class="chip" type="button">Which field had the highest production last quarter?</button>
+            <button class="chip" type="button">Show monthly production trend for Permian wells</button>
+            <button class="chip" type="button">Top 5 wells by average daily output</button>
+            <button class="chip" type="button">Compare operator performance by total barrels</button>
+            <button class="chip" type="button">Average depth by field</button>
+            <button class="chip" type="button">Month-over-month production change for W001</button>
+          </div>
+        </section>
+
+        <section class="card card--code">
+          <div class="card-header card-header--row">
+            <div>
+              <h2 class="card-title">Generated code</h2>
+              <p class="card-subtitle">Transparent analytics — review exactly what runs on your data.</p>
+            </div>
+            <button id="exportCodeBtn" class="btn btn-secondary" type="button" disabled>
+              Export code
+            </button>
+          </div>
+          <pre class="code-block"><code id="codeOutput" class="language-python"></code></pre>
+        </section>
+
+        <section class="card results-card" id="resultsSection">
+          <div class="card-header card-header--row">
+            <div>
+              <h2 class="card-title">Results</h2>
+              <p class="card-subtitle">Tabular output and visualization from your query.</p>
+            </div>
+            <button id="exportCsvBtn" class="btn btn-secondary" type="button" disabled>
+              Export CSV
+            </button>
+          </div>
+          <div id="errorBox" class="alert alert-error hidden" role="alert"></div>
+          <div id="emptyState" class="empty-state">
+            <p>Run a query to see results here.</p>
+          </div>
+          <div id="resultTableWrap" class="table-wrap hidden"></div>
+          <div class="chart-section hidden" id="chartSection">
+            <h3 class="section-label">Visualization</h3>
+            <div class="chart-wrap">
+              <canvas id="resultChart"></canvas>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <p>QueryMind — Enterprise data democratization demo</p>
+        <p class="footer-muted">Powered by AI-assisted analytics on well production data</p>
+      </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </body>
+</html>
