@@ -91,3 +91,10 @@ def get_history(limit: int = 10) -> List[Dict[str, Any]]:
         }
         for row in rows
     ]
+
+
+def clear_history() -> None:
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM query_log")
+        conn.commit()

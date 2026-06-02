@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>QueryMind — Natural Language Analytics</title>
+    <title>QueryMind — Well Production Analytics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link
@@ -17,138 +17,198 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   </head>
   <body>
-    <header class="site-header">
-      <div class="header-inner">
+    <header class="topbar">
+      <div class="topbar-inner">
         <a class="brand" href="/">
           <span class="brand-mark" aria-hidden="true"></span>
-          <span class="brand-text">QueryMind</span>
+          <span class="brand-name">QueryMind <span class="brand-sub">Energy Analytics</span></span>
         </a>
-        <nav class="header-nav" aria-label="Primary">
-          <span class="nav-item">Energy Analytics</span>
-          <span id="healthBadge" class="health-badge health-badge--loading">Checking data platform…</span>
-        </nav>
+        <span id="rowBadge" class="row-badge" title="Dataset size">… rows</span>
+        <div class="topbar-actions">
+          <span id="healthBadge" class="connection-pill connection-pill--loading">
+            <span class="connection-dot" aria-hidden="true"></span>
+            Checking…
+          </span>
+          <label class="btn btn-outline btn-import">
+            <input id="csvFileInput" type="file" accept=".csv,text/csv" class="sr-only" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Import CSV
+          </label>
+        </div>
       </div>
     </header>
 
-    <section class="hero">
-      <div class="hero-inner">
-        <p class="eyebrow">Technology &amp; Innovation</p>
-        <h1>Natural language analytics for well production data</h1>
-        <p class="hero-lead">
-          Ask business questions in plain English. QueryMind generates and executes analytics
-          on your production dataset — no SQL or PySpark required.
-        </p>
+    <div class="page-shell">
+      <header class="page-header">
+        <div class="page-header-text">
+          <h1>Well Production Analytics</h1>
+          <p class="page-subtitle">
+            Ask plain-English questions — get live data, charts, and auditable code.
+          </p>
+        </div>
+        <dl class="dataset-metrics" id="datasetMetrics">
+          <div><dt>data rows</dt><dd id="metricRows">—</dd></div>
+          <div><dt>fields</dt><dd id="metricFields">—</dd></div>
+          <div><dt>operators</dt><dd id="metricOperators">—</dd></div>
+          <div><dt>wells</dt><dd id="metricWells">—</dd></div>
+        </dl>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar" aria-label="Query input">
+          <div class="sidebar-panel">
+            <section class="sidebar-section">
+              <div class="section-head">
+                <h2 class="section-title">Ask a question</h2>
+                <kbd class="kbd-hint" title="Run analysis">⌘ Enter</kbd>
+              </div>
+              <label class="sr-only" for="questionInput">Your question</label>
+              <textarea
+                id="questionInput"
+                rows="4"
+                placeholder="e.g. Highest production by field last quarter"
+              ></textarea>
+              <button id="runBtn" class="btn btn-run" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Run Analysis
+              </button>
+              <p id="statusText" class="sidebar-status" role="status" aria-live="polite"></p>
+            </section>
+
+            <section class="sidebar-section sidebar-section--compact">
+              <h2 class="section-title">Example questions</h2>
+              <div id="exampleChips" class="chips chips--scroll">
+                <button class="chip" type="button">Highest production by field last quarter</button>
+                <button class="chip" type="button">Monthly Permian Basin trend for 2024</button>
+                <button class="chip" type="button">Top 5 wells by total production</button>
+                <button class="chip" type="button">Compare operator performance by total barrels</button>
+                <button class="chip" type="button">Average depth by field</button>
+                <button class="chip" type="button">Month-over-month production change for W001</button>
+              </div>
+            </section>
+
+            <section class="sidebar-section sidebar-section--grow">
+              <div class="section-head">
+                <h2 class="section-title">Recent queries</h2>
+                <button id="clearHistoryBtn" class="text-btn" type="button">Clear</button>
+              </div>
+              <ul id="historyList" class="history-list">
+                <li class="history-empty">No queries yet.</li>
+              </ul>
+            </section>
+
+            <section class="sidebar-section sidebar-section--footer" aria-label="Upcoming features">
+              <h2 class="section-title">Coming soon</h2>
+              <ul class="coming-soon-list">
+                <li>Schema preview</li>
+                <li>Saved favorites</li>
+                <li>Scheduled reports</li>
+              </ul>
+            </section>
+          </div>
+        </aside>
+
+        <section class="results-panel" id="resultsSection" aria-label="Query results">
+          <div class="results-panel-head">
+            <div class="results-title-wrap">
+              <h2 class="section-title">Results</h2>
+              <span id="rowCountBadge" class="count-badge hidden">0 rows</span>
+            </div>
+            <div class="view-tabs" role="tablist" aria-label="Result view">
+              <button
+                id="tabTable"
+                class="view-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panelTable"
+              >
+                Table
+              </button>
+              <button
+                id="tabChart"
+                class="view-tab view-tab--active"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="panelChart"
+              >
+                Chart
+              </button>
+              <button
+                id="tabCode"
+                class="view-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panelCode"
+              >
+                <span aria-hidden="true">&lt;/&gt;</span> Code
+              </button>
+            </div>
+          </div>
+
+          <div class="results-body">
+            <div id="successBar" class="success-bar hidden" role="status">
+              <span class="success-bar-icon" aria-hidden="true">✓</span>
+              <span id="successSummary" class="success-bar-text"></span>
+              <div class="success-bar-actions">
+                <span id="elapsedLabel" class="elapsed-label"></span>
+                <button id="exportCsvBtn" class="btn btn-export" type="button" disabled>
+                  Export CSV
+                </button>
+              </div>
+            </div>
+
+            <div id="errorBox" class="alert alert-error hidden" role="alert"></div>
+            <p id="importStatus" class="import-toast hidden" role="status"></p>
+
+            <div id="emptyState" class="results-empty">
+              <p>Run an analysis to see results, charts, and generated code.</p>
+            </div>
+
+            <div id="panelTable" class="result-panel hidden" role="tabpanel">
+              <div id="resultTableWrap" class="table-wrap"></div>
+            </div>
+
+            <div id="panelChart" class="result-panel hidden" role="tabpanel">
+              <div id="chartNoData" class="chart-placeholder hidden">
+                <p>No chart available for this result. Try the Table or Code view.</p>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="resultChart"></canvas>
+              </div>
+            </div>
+
+            <div id="panelCode" class="result-panel hidden" role="tabpanel">
+              <div class="code-toolbar">
+                <button id="exportCodeBtn" class="btn btn-secondary-sm" type="button" disabled>
+                  Export code
+                </button>
+                <a class="text-btn" href="/export/template">CSV template</a>
+              </div>
+              <pre class="code-block"><code id="codeOutput" class="language-python"></code></pre>
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
-
-    <main class="main-content">
-      <div class="content-grid">
-        <section class="card card--primary" id="querySection">
-          <div class="card-header">
-            <h2 class="card-title">Ask your question</h2>
-            <p class="card-subtitle">Describe what you want to learn from well production data.</p>
-          </div>
-          <label class="sr-only" for="questionInput">Your question</label>
-          <textarea
-            id="questionInput"
-            rows="4"
-            placeholder="e.g. Show monthly production trend for Permian wells"
-          ></textarea>
-          <div class="actions">
-            <button id="runBtn" class="btn btn-primary" type="button">Run Query</button>
-            <span id="statusText" class="status" role="status" aria-live="polite"></span>
-          </div>
-        </section>
-
-        <section class="card card--data">
-          <div class="card-header">
-            <h2 class="card-title">Data import &amp; export</h2>
-            <p class="card-subtitle">
-              Import a wells CSV (columns: well_id, month, production_bbl, field, operator, depth_ft)
-              or export your latest results.
-            </p>
-          </div>
-          <div class="data-actions">
-            <label class="file-picker">
-              <input id="csvFileInput" type="file" accept=".csv,text/csv" />
-              <span class="btn btn-secondary">Choose CSV file</span>
-            </label>
-            <button id="importCsvBtn" class="btn btn-secondary" type="button" disabled>
-              Import CSV
-            </button>
-            <a class="btn btn-link" href="/export/template">Download template</a>
-          </div>
-          <p id="importStatus" class="import-status" role="status"></p>
-        </section>
-
-        <section class="card card--history" aria-label="Recent queries">
-          <div class="card-header">
-            <h2 class="card-title">Recent queries</h2>
-            <p class="card-subtitle">Click a past question to load it again.</p>
-          </div>
-          <ul id="historyList" class="history-rail">
-            <li class="history-empty">No queries yet — run your first question above.</li>
-          </ul>
-        </section>
-
-        <section class="card">
-          <div class="card-header">
-            <h2 class="card-title">Example questions</h2>
-            <p class="card-subtitle">Click to try a demo query instantly.</p>
-          </div>
-          <div id="exampleChips" class="chips">
-            <button class="chip" type="button">Which field had the highest production last quarter?</button>
-            <button class="chip" type="button">Show monthly production trend for Permian wells</button>
-            <button class="chip" type="button">Top 5 wells by average daily output</button>
-            <button class="chip" type="button">Compare operator performance by total barrels</button>
-            <button class="chip" type="button">Average depth by field</button>
-            <button class="chip" type="button">Month-over-month production change for W001</button>
-          </div>
-        </section>
-
-        <section class="card card--code">
-          <div class="card-header card-header--row">
-            <div>
-              <h2 class="card-title">Generated code</h2>
-              <p class="card-subtitle">Transparent analytics — review exactly what runs on your data.</p>
-            </div>
-            <button id="exportCodeBtn" class="btn btn-secondary" type="button" disabled>
-              Export code
-            </button>
-          </div>
-          <pre class="code-block"><code id="codeOutput" class="language-python"></code></pre>
-        </section>
-
-        <section class="card results-card" id="resultsSection">
-          <div class="card-header card-header--row">
-            <div>
-              <h2 class="card-title">Results</h2>
-              <p class="card-subtitle">Tabular output and visualization from your query.</p>
-            </div>
-            <button id="exportCsvBtn" class="btn btn-secondary" type="button" disabled>
-              Export CSV
-            </button>
-          </div>
-          <div id="errorBox" class="alert alert-error hidden" role="alert"></div>
-          <div id="emptyState" class="empty-state">
-            <p>Run a query to see results here.</p>
-          </div>
-          <div id="resultTableWrap" class="table-wrap hidden"></div>
-          <div class="chart-section hidden" id="chartSection">
-            <h3 class="section-label">Visualization</h3>
-            <div class="chart-wrap">
-              <canvas id="resultChart"></canvas>
-            </div>
-          </div>
-        </section>
-      </div>
-    </main>
+    </div>
 
     <footer class="site-footer">
-      <div class="footer-inner">
-        <p>QueryMind — Enterprise data democratization demo</p>
-        <p class="footer-muted">Powered by AI-assisted analytics on well production data</p>
-      </div>
+      <p>
+        QueryMind Energy Analytics — Demo · Data is synthetic · AI-generated code is auditable ·
+        <strong>Democratizing data access for oil &amp; gas teams</strong>
+      </p>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

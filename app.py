@@ -1,6 +1,7 @@
 import io
 import os
 import math
+import time
 from datetime import date, datetime
 from typing import Any, Dict
 
@@ -15,9 +16,9 @@ from executor import (
     get_warehouse_state,
 )
 from data_io import import_wells_csv, result_to_csv_bytes
-from history import get_history, init_db, save_history
+from history import clear_history, get_history, init_db, save_history
 from prompts import generate_with_retry
-from schema import get_schema
+from schema import get_dataset_stats, get_schema
 
 load_dotenv(override=True)
 init_db()
@@ -98,10 +99,12 @@ def create_app() -> Flask:
                 500,
             )
 
+        started = time.perf_counter()
         try:
             code, exec_result, retry_count, _attempt_errors = generate_with_retry(
                 question, schema
             )
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
             response_result = _json_safe_result(exec_result)
             save_history(question, code, response_result, success=True)
             return jsonify(
@@ -111,6 +114,7 @@ def create_app() -> Flask:
                     "error": None,
                     "retry_count": retry_count,
                     "attempts": retry_count + 1,
+                    "elapsed_ms": elapsed_ms,
                 }
             )
         except Exception as e:
@@ -185,6 +189,19 @@ def create_app() -> Flask:
         except ValueError:
             limit_int = 10
         return jsonify({"history": get_history(limit=limit_int)})
+
+    @app.route("/history", methods=["DELETE"])
+    def history_clear() -> Any:
+        clear_history()
+        return jsonify({"ok": True})
+
+    @app.route("/dataset/stats", methods=["GET"])
+    def dataset_stats() -> Any:
+        try:
+            stats = get_dataset_stats()
+            return jsonify({"ok": True, **stats})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
 
     @app.route("/health", methods=["GET"])
     def health() -> Any:

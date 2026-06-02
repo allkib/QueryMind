@@ -78,6 +78,42 @@ def _format_schema(
     return "\n".join(lines)
 
 
+def get_dataset_stats() -> dict[str, int]:
+    """Row count and distinct field/operator/well counts for the UI header."""
+    if os.getenv("EXECUTOR", "local").lower() == "databricks":
+        from executor import _execute_databricks_sql
+
+        table = get_table_name()
+        stats_df = _execute_databricks_sql(
+            f"""
+            SELECT
+              COUNT(*) AS row_count,
+              COUNT(DISTINCT field) AS field_count,
+              COUNT(DISTINCT operator) AS operator_count,
+              COUNT(DISTINCT well_id) AS well_count
+            FROM {table}
+            """
+        )
+        row = stats_df.iloc[0]
+        return {
+            "row_count": int(row["row_count"]),
+            "field_count": int(row["field_count"]),
+            "operator_count": int(row["operator_count"]),
+            "well_count": int(row["well_count"]),
+        }
+
+    if not DATA_PATH.exists():
+        raise FileNotFoundError(f"Sample data not found at {DATA_PATH}")
+
+    df = pd.read_csv(DATA_PATH)
+    return {
+        "row_count": len(df),
+        "field_count": int(df["field"].nunique()) if "field" in df.columns else 0,
+        "operator_count": int(df["operator"].nunique()) if "operator" in df.columns else 0,
+        "well_count": int(df["well_id"].nunique()) if "well_id" in df.columns else 0,
+    }
+
+
 def load_dataframe() -> pd.DataFrame:
     """
     Load the wells.csv DataFrame for execution.

@@ -1,4 +1,6 @@
 let chartInstance = null;
+let activeView = "chart";
+let lastQueryStart = null;
 
 const CHEVRON_BLUE = "#0066b2";
 const CHEVRON_BLUE_LIGHT = "rgba(0, 102, 178, 0.15)";
@@ -10,20 +12,37 @@ const codeOutput = document.getElementById("codeOutput");
 const resultTableWrap = document.getElementById("resultTableWrap");
 const errorBox = document.getElementById("errorBox");
 const emptyState = document.getElementById("emptyState");
-const chartSection = document.getElementById("chartSection");
 const resultChartCanvas = document.getElementById("resultChart");
 const chipContainer = document.getElementById("exampleChips");
 const healthBadge = document.getElementById("healthBadge");
-const resultsSection = document.getElementById("resultsSection");
 const historyList = document.getElementById("historyList");
 const csvFileInput = document.getElementById("csvFileInput");
-const importCsvBtn = document.getElementById("importCsvBtn");
 const importStatus = document.getElementById("importStatus");
 const exportCsvBtn = document.getElementById("exportCsvBtn");
 const exportCodeBtn = document.getElementById("exportCodeBtn");
+const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+const rowBadge = document.getElementById("rowBadge");
+const rowCountBadge = document.getElementById("rowCountBadge");
+const successBar = document.getElementById("successBar");
+const successSummary = document.getElementById("successSummary");
+const elapsedLabel = document.getElementById("elapsedLabel");
+const chartNoData = document.getElementById("chartNoData");
+const tabTable = document.getElementById("tabTable");
+const tabChart = document.getElementById("tabChart");
+const tabCode = document.getElementById("tabCode");
+const panelTable = document.getElementById("panelTable");
+const panelChart = document.getElementById("panelChart");
+const panelCode = document.getElementById("panelCode");
+const chartWrap = document.querySelector(".chart-wrap");
+
+const metricRows = document.getElementById("metricRows");
+const metricFields = document.getElementById("metricFields");
+const metricOperators = document.getElementById("metricOperators");
+const metricWells = document.getElementById("metricWells");
 
 let lastQueryResult = null;
 let lastGeneratedCode = "";
+let chartAvailable = false;
 
 function downloadBlob(content, filename, mimeType) {
   const blob = new Blob([content], { type: mimeType });
@@ -53,16 +72,28 @@ function resultToCsvText(result) {
   return lines.join("\n");
 }
 
+function formatCount(n) {
+  if (n === null || n === undefined || Number.isNaN(n)) {
+    return "—";
+  }
+  return Number(n).toLocaleString();
+}
+
 function setImportStatus(message, tone = "default") {
   if (!importStatus) {
     return;
   }
   importStatus.textContent = message || "";
-  importStatus.classList.remove("import-status--ok", "import-status--error");
+  importStatus.classList.remove("hidden", "import-toast--ok", "import-toast--error");
+  if (!message) {
+    importStatus.classList.add("hidden");
+    return;
+  }
+  importStatus.classList.remove("hidden");
   if (tone === "success") {
-    importStatus.classList.add("import-status--ok");
+    importStatus.classList.add("import-toast--ok");
   } else if (tone === "error") {
-    importStatus.classList.add("import-status--error");
+    importStatus.classList.add("import-toast--error");
   }
 }
 
@@ -80,12 +111,15 @@ function updateExportButtons() {
 }
 
 function setStatus(message, tone = "default") {
+  if (!statusText) {
+    return;
+  }
   statusText.textContent = message;
-  statusText.classList.remove("status--success", "status--error");
+  statusText.classList.remove("sidebar-status--success", "sidebar-status--error");
   if (tone === "success") {
-    statusText.classList.add("status--success");
+    statusText.classList.add("sidebar-status--success");
   } else if (tone === "error") {
-    statusText.classList.add("status--error");
+    statusText.classList.add("sidebar-status--error");
   }
 }
 
@@ -97,6 +131,60 @@ function setError(message) {
   }
   errorBox.textContent = message;
   errorBox.classList.remove("hidden");
+}
+
+function setActiveView(view) {
+  activeView = view;
+  const tabs = [
+    { tab: tabTable, panel: panelTable, id: "table" },
+    { tab: tabChart, panel: panelChart, id: "chart" },
+    { tab: tabCode, panel: panelCode, id: "code" }
+  ];
+  tabs.forEach(({ tab, panel, id }) => {
+    const on = id === view;
+    tab?.classList.toggle("view-tab--active", on);
+    tab?.setAttribute("aria-selected", on ? "true" : "false");
+    panel?.classList.toggle("hidden", !on);
+  });
+}
+
+function showResultsChrome(hasData) {
+  emptyState?.classList.toggle("hidden", hasData);
+  if (!hasData) {
+    [panelTable, panelChart, panelCode].forEach((panel) => panel?.classList.add("hidden"));
+    successBar?.classList.add("hidden");
+    rowCountBadge?.classList.add("hidden");
+  } else {
+    successBar?.classList.remove("hidden");
+  }
+}
+
+function buildSuccessSummary(result) {
+  const rows = result?.rows || [];
+  const cols = result?.columns || [];
+  if (!rows.length) {
+    return "Query completed — 0 rows returned. Check date filters in generated code.";
+  }
+  if (rows.length === 1 && cols.length <= 4) {
+    const parts = cols.slice(0, 3).map((c) => {
+      const v = rows[0][c];
+      if (typeof v === "number" && Math.abs(v) >= 1000) {
+        return `${c}: ${(v / 1000).toFixed(1)}K`;
+      }
+      return `${c}: ${v}`;
+    });
+    return parts.join(" · ");
+  }
+  return `${rows.length} row${rows.length === 1 ? "" : "s"} · ${cols.length} column${cols.length === 1 ? "" : "s"}`;
+}
+
+function updateRowCountBadge(result) {
+  const count = (result?.rows || []).length;
+  if (!rowCountBadge) {
+    return;
+  }
+  rowCountBadge.textContent = `${count} row${count === 1 ? "" : "s"}`;
+  rowCountBadge.classList.remove("hidden");
 }
 
 function escapeHtml(value) {
@@ -117,33 +205,20 @@ function renderCode(code) {
   updateExportButtons();
 }
 
-function showResultsArea(hasTable) {
-  if (hasTable) {
-    emptyState.classList.add("hidden");
-    resultTableWrap.classList.remove("hidden");
-  } else {
-    emptyState.classList.remove("hidden");
-    resultTableWrap.classList.add("hidden");
-    resultTableWrap.innerHTML = "";
-  }
-}
-
 function renderTable(result) {
   lastQueryResult = result || null;
   updateExportButtons();
   resultTableWrap.innerHTML = "";
   if (!result || !result.columns) {
-    showResultsArea(false);
     return;
   }
 
   const rows = result.rows || [];
   if (!rows.length) {
-    showResultsArea(true);
     const notice = document.createElement("p");
     notice.className = "empty-result-notice";
     notice.textContent =
-      "Query succeeded but returned 0 rows. The filters may not match any data in the table (check date ranges in the generated SQL).";
+      "Query succeeded but returned 0 rows. Filters may not match data (check date ranges in generated code).";
     resultTableWrap.appendChild(notice);
 
     const table = document.createElement("table");
@@ -184,7 +259,6 @@ function renderTable(result) {
   });
   table.appendChild(tbody);
   resultTableWrap.appendChild(table);
-  showResultsArea(true);
 }
 
 function pickChartColumns(result) {
@@ -236,9 +310,11 @@ function renderChart(result) {
     chartInstance = null;
   }
 
+  chartAvailable = false;
   const columns = pickChartColumns(result);
   if (!columns) {
-    chartSection.classList.add("hidden");
+    chartNoData?.classList.remove("hidden");
+    chartWrap?.classList.add("hidden");
     return;
   }
 
@@ -255,15 +331,19 @@ function renderChart(result) {
     .filter((point) => Number.isFinite(point.value));
 
   if (!points.length) {
-    chartSection.classList.add("hidden");
+    chartNoData?.classList.remove("hidden");
+    chartWrap?.classList.add("hidden");
     return;
   }
 
-  chartSection.classList.remove("hidden");
+  chartAvailable = true;
+  chartNoData?.classList.add("hidden");
+  chartWrap?.classList.remove("hidden");
 
   const labels = points.map((point) => point.label);
   const values = points.map((point) => point.value);
   const chartType = points.length > 12 ? "line" : "bar";
+  const yTitle = columns.valueCol.replace(/_/g, " ");
 
   chartInstance = new Chart(resultChartCanvas, {
     type: chartType,
@@ -271,14 +351,15 @@ function renderChart(result) {
       labels,
       datasets: [
         {
-          label: columns.valueCol,
+          label: yTitle,
           data: values,
           borderColor: CHEVRON_BLUE,
           backgroundColor: chartType === "line" ? CHEVRON_BLUE_LIGHT : CHEVRON_BLUE,
           borderWidth: chartType === "line" ? 2 : 0,
           fill: chartType === "line",
           tension: 0.25,
-          borderRadius: chartType === "bar" ? 4 : 0
+          borderRadius: chartType === "bar" ? 6 : 0,
+          maxBarThickness: 80
         }
       ]
     },
@@ -286,25 +367,50 @@ function renderChart(result) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {
-          labels: {
-            color: "#5c6670",
-            font: { family: "'Source Sans 3', sans-serif", size: 12 }
-          }
-        }
+        legend: { display: false }
       },
       scales: {
         x: {
-          ticks: { color: "#5c6670", font: { family: "'Source Sans 3', sans-serif" } },
-          grid: { color: "rgba(0, 45, 98, 0.06)" }
+          title: {
+            display: true,
+            text: columns.labelCol.replace(/_/g, " "),
+            font: { family: "Inter, sans-serif", size: 12, weight: "600" },
+            color: "#5c6670"
+          },
+          ticks: { color: "#5c6670", font: { family: "Inter, sans-serif", size: 11 } },
+          grid: { display: false }
         },
         y: {
-          ticks: { color: "#5c6670", font: { family: "'Source Sans 3', sans-serif" } },
-          grid: { color: "rgba(0, 45, 98, 0.08)" }
+          title: {
+            display: true,
+            text: yTitle,
+            font: { family: "Inter, sans-serif", size: 12, weight: "600" },
+            color: "#5c6670"
+          },
+          ticks: {
+            color: "#5c6670",
+            font: { family: "Inter, sans-serif", size: 11 },
+            callback(value) {
+              const n = Number(value);
+              if (n >= 1000) {
+                return `${n / 1000}K`;
+              }
+              return n;
+            }
+          },
+          grid: { color: "rgba(10, 37, 64, 0.06)" }
         }
       }
     }
   });
+}
+
+function pickDefaultView(result) {
+  if (pickChartColumns(result)) {
+    setActiveView("chart");
+  } else {
+    setActiveView("table");
+  }
 }
 
 function formatHistoryTime(isoTimestamp) {
@@ -337,40 +443,60 @@ async function loadHistory() {
     if (!items.length) {
       const empty = document.createElement("li");
       empty.className = "history-empty";
-      empty.textContent = "No queries yet — run your first question above.";
+      empty.textContent = "No queries yet.";
       historyList.appendChild(empty);
       return;
     }
 
     items.forEach((item) => {
       const li = document.createElement("li");
-      li.className = `history-item ${item.success ? "history-item--ok" : "history-item--fail"}`;
-
       const btn = document.createElement("button");
       btn.type = "button";
       btn.dataset.question = item.question || "";
       btn.dataset.code = item.generated_code || "";
 
-      const q = document.createElement("span");
-      q.className = "history-question";
-      q.textContent = item.question || "(no question)";
+      const label = document.createElement("span");
+      label.textContent = item.question || "(no question)";
 
       const meta = document.createElement("span");
       meta.className = "history-meta";
       meta.textContent = `${item.success ? "Success" : "Failed"} · ${formatHistoryTime(item.timestamp)}`;
 
-      const preview = document.createElement("span");
-      preview.className = "history-preview";
-      preview.textContent = item.result_preview || "";
-
-      btn.appendChild(q);
+      btn.appendChild(label);
       btn.appendChild(meta);
-      btn.appendChild(preview);
       li.appendChild(btn);
       historyList.appendChild(li);
     });
   } catch (error) {
     console.error("History load error:", error);
+  }
+}
+
+async function loadDatasetStats() {
+  try {
+    const response = await fetch("/dataset/stats");
+    const data = await response.json();
+    if (!data.ok) {
+      return;
+    }
+    const rows = data.row_count;
+    if (metricRows) {
+      metricRows.textContent = formatCount(rows);
+    }
+    if (metricFields) {
+      metricFields.textContent = formatCount(data.field_count);
+    }
+    if (metricOperators) {
+      metricOperators.textContent = formatCount(data.operator_count);
+    }
+    if (metricWells) {
+      metricWells.textContent = formatCount(data.well_count);
+    }
+    if (rowBadge) {
+      rowBadge.textContent = `~${formatCount(rows)} rows`;
+    }
+  } catch (error) {
+    console.error("Dataset stats error:", error);
   }
 }
 
@@ -387,21 +513,32 @@ historyList?.addEventListener("click", (event) => {
   questionInput.focus();
 });
 
+clearHistoryBtn?.addEventListener("click", async () => {
+  try {
+    await fetch("/history", { method: "DELETE" });
+    loadHistory();
+  } catch (error) {
+    console.error("Clear history error:", error);
+  }
+});
+
 async function refreshHealthBadge() {
   if (!healthBadge) {
     return;
   }
 
-  healthBadge.className = "health-badge health-badge--loading";
-  healthBadge.textContent = "Checking data platform…";
+  healthBadge.className = "connection-pill connection-pill--loading";
+  healthBadge.innerHTML =
+    '<span class="connection-dot" aria-hidden="true"></span>Checking…';
 
   try {
     const healthResponse = await fetch("/health");
     const health = await healthResponse.json();
 
     if (health.mode !== "databricks") {
-      healthBadge.className = "health-badge health-badge--ok";
-      healthBadge.textContent = "Local mode · sample CSV";
+      healthBadge.className = "connection-pill connection-pill--ok";
+      healthBadge.innerHTML =
+        '<span class="connection-dot" aria-hidden="true"></span>Local · CSV';
       return;
     }
 
@@ -411,42 +548,41 @@ async function refreshHealthBadge() {
     window.clearTimeout(timeoutId);
     const data = await dbResponse.json();
 
-    if (data.ok && data.latency_ms !== undefined) {
-      healthBadge.className = "health-badge health-badge--ok";
-      const wh = data.warehouse_state ? ` · ${data.warehouse_state}` : "";
-      healthBadge.textContent = `Databricks connected · ${data.latency_ms}ms${wh}`;
+    if (data.ok) {
+      healthBadge.className = "connection-pill connection-pill--ok";
+      healthBadge.innerHTML =
+        '<span class="connection-dot" aria-hidden="true"></span>Connected';
       return;
     }
 
-    healthBadge.className = "health-badge health-badge--error";
-    const wh = data.warehouse_state ? ` (${data.warehouse_state})` : "";
-    healthBadge.textContent = (data.error || "Databricks unreachable") + wh;
+    healthBadge.className = "connection-pill connection-pill--error";
+    healthBadge.innerHTML = `<span class="connection-dot" aria-hidden="true"></span>${escapeHtml(
+      (data.error || "Unreachable").slice(0, 40)
+    )}`;
   } catch (error) {
-    healthBadge.className = "health-badge health-badge--error";
-    if (error && error.name === "AbortError") {
-      healthBadge.textContent = "Databricks timeout — start warehouse";
-    } else {
-      healthBadge.textContent = "Platform check failed";
-    }
+    healthBadge.className = "connection-pill connection-pill--error";
+    const msg =
+      error && error.name === "AbortError" ? "Timeout" : "Check failed";
+    healthBadge.innerHTML = `<span class="connection-dot" aria-hidden="true"></span>${msg}`;
   }
 }
 
 async function runQuery() {
   const question = questionInput.value.trim();
   if (!question) {
-    setError("Enter a question before running a query.");
+    setError("Enter a question before running analysis.");
     return;
   }
 
   setError("");
-  setStatus("Running query…");
+  setStatus("Generating and running analysis…");
   runBtn.disabled = true;
+  lastQueryStart = performance.now();
   let timeoutId = null;
 
   try {
     const controller = new AbortController();
-    const timeoutMs = 180000;
-    timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    timeoutId = window.setTimeout(() => controller.abort(), 180000);
 
     const response = await fetch("/query", {
       method: "POST",
@@ -461,7 +597,7 @@ async function runQuery() {
       data = rawBody ? JSON.parse(rawBody) : {};
     } catch {
       setError(`Server returned non-JSON response (${response.status}).`);
-      setStatus("Query failed.", "error");
+      setStatus("Analysis failed.", "error");
       return;
     }
 
@@ -473,37 +609,47 @@ async function runQuery() {
 
     if (!response.ok || data.error) {
       setError(data.error || "Query failed.");
-      setStatus("Query failed.", "error");
+      setStatus("Analysis failed.", "error");
+      showResultsChrome(false);
       return;
     }
+
+    const elapsedMs =
+      data.elapsed_ms ?? Math.round(performance.now() - (lastQueryStart || performance.now()));
 
     try {
       renderTable(data.result);
       renderChart(data.result);
-      resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      pickDefaultView(data.result);
+      showResultsChrome(true);
+      updateRowCountBadge(data.result);
+      if (successSummary) {
+        successSummary.textContent = buildSuccessSummary(data.result);
+      }
+      if (elapsedLabel) {
+        elapsedLabel.textContent = `${(elapsedMs / 1000).toFixed(1)}s`;
+      }
     } catch (renderError) {
       console.error("Render error:", renderError);
       setError(`Result rendered partially: ${renderError.message || renderError}`);
-      setStatus("Done with render warning.", "error");
+      setStatus("Done with warnings.", "error");
       return;
     }
 
     const retries = data.retry_count ?? 0;
     if (retries > 0) {
-      setStatus(`Analysis complete · auto-fixed after ${retries} retr${retries === 1 ? "y" : "ies"}`, "success");
+      setStatus(`Complete · auto-fixed after ${retries} retr${retries === 1 ? "y" : "ies"}`, "success");
     } else {
       setStatus("Analysis complete.", "success");
     }
   } catch (error) {
     if (error && error.name === "AbortError") {
-      setError(
-        "Query timed out after 90s. The data warehouse may be starting — retry in a moment."
-      );
-      setStatus("Query timed out.", "error");
+      setError("Query timed out. The warehouse may be starting — try again shortly.");
+      setStatus("Timed out.", "error");
       return;
     }
     setError(`Network or server error: ${error.message}`);
-    setStatus("Query failed.", "error");
+    setStatus("Analysis failed.", "error");
   } finally {
     if (timeoutId !== null) {
       window.clearTimeout(timeoutId);
@@ -513,28 +659,12 @@ async function runQuery() {
   }
 }
 
-csvFileInput?.addEventListener("change", () => {
-  const file = csvFileInput.files?.[0];
-  if (importCsvBtn) {
-    importCsvBtn.disabled = !file;
-  }
-  if (file) {
-    setImportStatus(`Selected: ${file.name}`);
-  } else {
-    setImportStatus("");
-  }
-});
-
-importCsvBtn?.addEventListener("click", async () => {
-  const file = csvFileInput?.files?.[0];
+async function importCsvFile(file) {
   if (!file) {
-    setImportStatus("Choose a CSV file first.", "error");
     return;
   }
 
   setImportStatus("Importing…");
-  importCsvBtn.disabled = true;
-
   const formData = new FormData();
   formData.append("file", file);
 
@@ -550,28 +680,27 @@ importCsvBtn?.addEventListener("click", async () => {
     }
     setImportStatus(data.message || `Imported ${data.rows} rows.`, "success");
     csvFileInput.value = "";
-    importCsvBtn.disabled = true;
+    loadDatasetStats();
     refreshHealthBadge();
+    window.setTimeout(() => setImportStatus(""), 6000);
   } catch (error) {
     setImportStatus(`Import failed: ${error.message}`, "error");
-  } finally {
-    if (csvFileInput?.files?.[0]) {
-      importCsvBtn.disabled = false;
-    }
+  }
+}
+
+csvFileInput?.addEventListener("change", () => {
+  const file = csvFileInput.files?.[0];
+  if (file) {
+    importCsvFile(file);
   }
 });
 
 exportCsvBtn?.addEventListener("click", () => {
-  if (!lastQueryResult || !lastQueryResult.columns) {
-    setError("No results to export. Run a query first.");
+  if (!lastQueryResult?.rows?.length) {
+    setError("No results to export.");
     return;
   }
-  if (!lastQueryResult.rows?.length) {
-    setError("No rows to export.");
-    return;
-  }
-  const csv = resultToCsvText(lastQueryResult);
-  downloadBlob(csv, "querymind-results.csv", "text/csv;charset=utf-8");
+  downloadBlob(resultToCsvText(lastQueryResult), "querymind-results.csv", "text/csv;charset=utf-8");
 });
 
 exportCodeBtn?.addEventListener("click", () => {
@@ -584,15 +713,16 @@ exportCodeBtn?.addEventListener("click", () => {
   downloadBlob(lastGeneratedCode, `querymind-query.${ext}`, "text/plain;charset=utf-8");
 });
 
-runBtn.addEventListener("click", runQuery);
+runBtn?.addEventListener("click", runQuery);
 
-questionInput.addEventListener("keydown", (event) => {
+questionInput?.addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    event.preventDefault();
     runQuery();
   }
 });
 
-chipContainer.addEventListener("click", (event) => {
+chipContainer?.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLButtonElement)) {
     return;
@@ -601,8 +731,14 @@ chipContainer.addEventListener("click", (event) => {
   questionInput.focus();
 });
 
-renderCode("# Generated code will appear here");
-setStatus("Ready to analyze.");
+tabTable?.addEventListener("click", () => setActiveView("table"));
+tabChart?.addEventListener("click", () => setActiveView("chart"));
+tabCode?.addEventListener("click", () => setActiveView("code"));
+
+renderCode("");
+setStatus("Ready — ask a question or try an example.");
+showResultsChrome(false);
 updateExportButtons();
 refreshHealthBadge();
+loadDatasetStats();
 loadHistory();
