@@ -184,21 +184,22 @@ def generate_with_retry(question, schema, max_retries=3):
 
 #### Day 8 — Containerize
 
-- [ ] `Dockerfile`: Python 3.11-slim, gunicorn on port 8000
-- [ ] `.dockerignore`: venv, `__pycache__`, `.env`
-- [ ] Local test: `docker build -t querymind . && docker run -p 8000:8000 --env-file .env`
+- [x] `Dockerfile`: Python 3.11-slim, gunicorn on port 8000
+- [x] `.dockerignore`: venv, `__pycache__`, `.env`
+- [x] `gunicorn.conf.py` (300s timeout for LLM/Databricks)
+- [x] Local test: `docker build -t querymind . && docker run -p 8000:8000 --env-file .env`
 
 #### Day 9 — Azure App Service
 
-- [ ] Resource group + F1 plan (Azure for Students)
+- [ ] Resource group + F1 plan (Azure for Students) — run [docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md)
 - [ ] Web app with app settings: `DUKE_API_KEY`, `DATABRICKS_*`, `EXECUTOR=databricks`
-- [ ] Deploy container or zip deploy; verify `/query` health
+- [ ] Deploy container; verify `/health` and `/query`
 
 #### Day 10 — Portfolio polish
 
-- [ ] README: GIF demo, architecture diagram, env setup, security notes
-- [ ] Optional: custom domain (.tech via GitHub Student Pack)
-- [ ] GitHub repo public with clean commit history per phase
+- [x] README: architecture diagram, env setup, security notes, Docker quick start
+- [x] [docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md) — full Azure CLI guide
+- [ ] Optional: `docs/demo.gif`, custom domain, public GitHub
 
 **Phase 3 exit criteria:** Live HTTPS URL; secrets only in App Service config; README documents full stack.
 
