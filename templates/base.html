@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}" />
   </head>
-  <body class="{% block body_class %}{% endblock %}">
+  <body class="{% block body_class %}{% endblock %}" data-page="{{ active_page | default('') }}">
     <header class="topbar">
       <div class="topbar-inner topbar-inner--nav">
         <a class="brand" href="/">
@@ -41,28 +41,51 @@
             >Schema</a
           >
         </nav>
-        <span id="rowBadge" class="row-badge row-badge--pending" title="Dataset size"></span>
         <div class="topbar-actions">
-          <span id="healthBadge" class="connection-pill connection-pill--loading">
-            <span class="connection-dot" aria-hidden="true"></span>
-            Checking…
-          </span>
-          <input id="csvFileInput" type="file" accept=".csv,text/csv" class="sr-only" />
-          <label id="importCsvPrimary" class="btn btn-outline btn-import" for="csvFileInput">
+          {% if active_page == 'workspace' %}
+          <div class="topbar-import">
+            <input id="csvFileInput" type="file" accept=".csv,text/csv" class="sr-only" />
+            <label id="importCsvPrimary" class="btn btn-outline btn-import" for="csvFileInput">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              Import CSV
+            </label>
+            <button id="importCsvOptional" class="btn-import-optional hidden" type="button">
+              Local CSV
+            </button>
+          </div>
+          <span class="topbar-divider" aria-hidden="true"></span>
+          {% endif %}
+          <button id="tourBtn" class="btn btn-ghost-light btn-tour" type="button" title="Take a guided tour">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
-                d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                d="M12 4L2 9l10 5 10-5-10-5z"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5M21 9v5"
                 stroke="currentColor"
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
             </svg>
-            Import CSV
-          </label>
-          <button id="importCsvOptional" class="btn-import-optional hidden" type="button">
-            Local CSV
+            <span class="btn-tour-label">Tutorial</span>
           </button>
+          <span class="topbar-divider" aria-hidden="true"></span>
+          <div class="auth-actions">
+            <button id="signInBtn" class="btn btn-ghost-light" type="button">Sign in</button>
+            <button id="signUpBtn" class="btn btn-signup" type="button">Sign up</button>
+          </div>
         </div>
       </div>
     </header>
@@ -78,8 +101,124 @@
 
     <p id="importStatus" class="import-toast import-toast--fixed hidden" role="status"></p>
 
+    <div id="authModal" class="auth-modal hidden" aria-hidden="true">
+      <div class="auth-overlay" data-auth-close></div>
+      <div
+        class="auth-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="authTitle"
+      >
+        <button class="auth-close" type="button" data-auth-close aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+
+        <div id="authForms">
+          <a class="auth-brand" href="/" aria-label="QueryMind home">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="auth-brand-name">QueryMind</span>
+          </a>
+
+          <div class="auth-tabs" role="tablist" aria-label="Authentication">
+            <button id="tabSignIn" class="auth-tab auth-tab--active" type="button" role="tab" aria-selected="true">
+              Sign in
+            </button>
+            <button id="tabSignUp" class="auth-tab" type="button" role="tab" aria-selected="false">
+              Sign up
+            </button>
+          </div>
+
+          <h2 id="authTitle" class="auth-title display-serif">Welcome back</h2>
+          <p id="authSub" class="auth-sub">Sign in to save queries, dashboards, and reports.</p>
+
+          <form id="authForm" class="auth-form" novalidate>
+            <div class="auth-field auth-field--name hidden">
+              <label for="authName">Full name</label>
+              <input id="authName" type="text" autocomplete="name" placeholder="Jane Doe" />
+            </div>
+            <div class="auth-field">
+              <label for="authEmail">Work email</label>
+              <input
+                id="authEmail"
+                type="email"
+                autocomplete="email"
+                placeholder="jane@company.com"
+                required
+              />
+            </div>
+            <div class="auth-field">
+              <label for="authPassword">Password</label>
+              <input
+                id="authPassword"
+                type="password"
+                autocomplete="current-password"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+            <button id="authSubmit" class="btn btn-primary auth-submit" type="submit">
+              Sign in
+            </button>
+          </form>
+
+          <div class="auth-divider"><span>or</span></div>
+
+          <button class="btn auth-sso" type="button" data-auth-sso>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 3l7 4v5c0 4.4-3 7.8-7 9-4-1.2-7-4.6-7-9V7l7-4z"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linejoin="round"
+              />
+              <path d="M9.5 12l2 2 3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Continue with enterprise SSO
+          </button>
+
+          <p class="auth-fineprint">
+            By continuing you agree to QueryMind's demo terms. This is a portfolio
+            project — do not enter real credentials.
+          </p>
+        </div>
+
+        <div id="authNotice" class="auth-notice hidden" role="status">
+          <div class="auth-notice-icon" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+              <path
+                d="M12 7v5l3 2"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+          <h2 class="auth-notice-title display-serif">Thanks for trying QueryMind</h2>
+          <p class="auth-notice-text">
+            Accounts are still in development — we've noted your interest, so please
+            check back soon. In the meantime, the full workspace is open to explore.
+          </p>
+          <a class="btn btn-primary auth-submit" href="/workspace">Explore the workspace</a>
+          <button class="text-btn auth-notice-dismiss" type="button" data-auth-close>
+            Maybe later
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/data-cache.js') }}"></script>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tour.js') }}"></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>
