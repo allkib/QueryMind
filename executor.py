@@ -16,6 +16,10 @@ from schema import load_dataframe
 T = TypeVar("T")
 DATABRICKS_TIMEOUT_SEC = int(os.getenv("DATABRICKS_TIMEOUT_SEC", "60"))
 WAREHOUSE_START_TIMEOUT_SEC = int(os.getenv("WAREHOUSE_START_TIMEOUT_SEC", "120"))
+HEALTH_CACHE_TTL_SEC = int(os.getenv("DATABRICKS_HEALTH_CACHE_SEC", "120"))
+
+_health_cache: Dict[str, Any] | None = None
+_health_cache_at: float = 0.0
 
 
 def get_executor_mode() -> str:
@@ -304,22 +308,84 @@ def _execute_databricks_sql(query: str) -> pd.DataFrame:
         raise RuntimeError(f"Error while executing Databricks SQL: {exc}") from exc
 
 
-def databricks_healthcheck() -> Dict[str, Any]:
+def clear_databricks_health_cache() -> None:
+    """Drop cached health results (e.g. after a failed query)."""
+    global _health_cache, _health_cache_at
+    _health_cache = None
+    _health_cache_at = 0.0
+
+
+def databricks_health_light() -> Dict[str, Any]:
     """
-    Run a lightweight connectivity check against the Databricks SQL warehouse.
+    Fast health probe: warehouse REST state only (no SQL statement).
+    Used on page navigation to avoid redundant SELECT 1 calls.
+    """
+    started = time.perf_counter()
+    warehouse_state = ensure_warehouse_running()
+    latency_ms = int((time.perf_counter() - started) * 1000)
+    return {
+        "probe": "light",
+        "latency_ms": latency_ms,
+        "warehouse_state": warehouse_state,
+    }
+
+
+def databricks_health_full() -> Dict[str, Any]:
+    """
+    Full connectivity check: warehouse state plus SELECT 1 through the SQL API.
     """
     started = time.perf_counter()
     warehouse = get_warehouse_state()
     warehouse_state = str(warehouse.get("state", "UNKNOWN"))
+    if warehouse_state != "RUNNING":
+        warehouse_state = ensure_warehouse_running()
     result = _execute_databricks_sql("SELECT 1 AS ok")
     latency_ms = int((time.perf_counter() - started) * 1000)
     ok_value = None
     if not result.empty and "ok" in result.columns:
         ok_value = result.iloc[0]["ok"]
     return {
+        "probe": "full",
         "latency_ms": latency_ms,
         "rows": len(result),
         "ok_value": ok_value,
         "warehouse_state": warehouse_state,
     }
+
+
+def databricks_healthcheck(probe: str = "light") -> Dict[str, Any]:
+    """Run a Databricks health probe (`light` or `full`)."""
+    if probe == "full":
+        return databricks_health_full()
+    return databricks_health_light()
+
+
+def get_databricks_health(
+    probe: str = "light",
+    *,
+    use_cache: bool = True,
+    force: bool = False,
+) -> Dict[str, Any]:
+    """
+    Return cached health when still fresh so page loads do not re-hit the warehouse.
+    """
+    global _health_cache, _health_cache_at
+
+    probe = probe if probe in {"light", "full"} else "light"
+    now = time.time()
+
+    if (
+        use_cache
+        and not force
+        and _health_cache is not None
+        and (now - _health_cache_at) < HEALTH_CACHE_TTL_SEC
+        and _health_cache.get("probe") == probe
+    ):
+        return {**_health_cache, "cached": True}
+
+    result = databricks_healthcheck(probe=probe)
+    _health_cache = result
+    _health_cache_at = now
+    return {**result, "cached": False}
+
 

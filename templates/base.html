@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}QueryMind — Energy Analytics{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap"
+      rel="stylesheet"
+    />
+    {% block head_extra %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}" />
+  </head>
+  <body class="{% block body_class %}{% endblock %}">
+    <header class="topbar">
+      <div class="topbar-inner topbar-inner--nav">
+        <a class="brand" href="/">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-name">QueryMind <span class="brand-sub">Energy Analytics</span></span>
+        </a>
+        <nav class="topnav" aria-label="Main">
+          <a
+            class="topnav-link{% if active_page == 'dashboard' %} topnav-link--active{% endif %}"
+            href="/dashboard"
+            {% if active_page == 'dashboard' %}aria-current="page"{% endif %}
+            >Dashboard</a
+          >
+          <a
+            class="topnav-link{% if active_page == 'workspace' %} topnav-link--active{% endif %}"
+            href="/workspace"
+            {% if active_page == 'workspace' %}aria-current="page"{% endif %}
+            >Workspace</a
+          >
+          <a
+            class="topnav-link{% if active_page == 'schema' %} topnav-link--active{% endif %}"
+            href="/schema"
+            {% if active_page == 'schema' %}aria-current="page"{% endif %}
+            >Schema</a
+          >
+        </nav>
+        <span id="rowBadge" class="row-badge row-badge--pending" title="Dataset size"></span>
+        <div class="topbar-actions">
+          <span id="healthBadge" class="connection-pill connection-pill--loading">
+            <span class="connection-dot" aria-hidden="true"></span>
+            Checking…
+          </span>
+          <input id="csvFileInput" type="file" accept=".csv,text/csv" class="sr-only" />
+          <label id="importCsvPrimary" class="btn btn-outline btn-import" for="csvFileInput">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Import CSV
+          </label>
+          <button id="importCsvOptional" class="btn-import-optional hidden" type="button">
+            Local CSV
+          </button>
+        </div>
+      </div>
+    </header>
+
+    {% block content %}{% endblock %}
+
+    <footer class="site-footer">
+      <p>
+        QueryMind Energy Analytics — Demo · Data is synthetic · AI-generated code is auditable ·
+        <strong>Democratizing data access for oil &amp; gas teams</strong>
+      </p>
+    </footer>
+
+    <p id="importStatus" class="import-toast import-toast--fixed hidden" role="status"></p>
+
+    <script src="{{ url_for('static', filename='js/data-cache.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

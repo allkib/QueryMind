@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% set active_page = "workspace" %}
+{% block title %}Workspace — QueryMind{% endblock %}
+
+{% block head_extra %}
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/atom-one-light.min.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-shell">
+  <header class="page-header">
+    <div class="page-header-text">
+      <h1>Well Production Analytics</h1>
+      <p class="page-subtitle">
+        Ask plain-English questions — get live data, charts, and auditable code.
+      </p>
+    </div>
+    <dl class="dataset-metrics" id="datasetMetrics">
+      <div><dt>data rows</dt><dd id="metricRows" data-qm-stat="rows"></dd></div>
+      <div><dt>fields</dt><dd id="metricFields" data-qm-stat="fields"></dd></div>
+      <div><dt>operators</dt><dd id="metricOperators" data-qm-stat="operators"></dd></div>
+      <div><dt>wells</dt><dd id="metricWells" data-qm-stat="wells"></dd></div>
+    </dl>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar sidebar--query" aria-label="Query input">
+      <div class="sidebar-panel">
+        <section class="sidebar-section">
+          <div class="section-head">
+            <h2 class="section-title">Ask a question</h2>
+            <kbd class="kbd-hint" title="Run analysis">⌘ Enter</kbd>
+          </div>
+          <label class="sr-only" for="questionInput">Your question</label>
+          <textarea
+            id="questionInput"
+            rows="4"
+            placeholder="e.g. Top 5 wells by production in Q4 2024…"
+          ></textarea>
+          <button id="runBtn" class="btn btn-run" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            Run Analysis
+          </button>
+          <p id="statusText" class="sidebar-status" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </aside>
+
+    <section class="results-panel" id="resultsSection" aria-label="Query results">
+      <div class="results-panel-head">
+        <div class="results-title-wrap">
+          <h2 class="section-title">Results</h2>
+          <span id="rowCountBadge" class="count-badge hidden">0 rows</span>
+        </div>
+        <div class="view-tabs" role="tablist" aria-label="Result view">
+          <button
+            id="tabTable"
+            class="view-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panelTable"
+            disabled
+          >
+            Table
+          </button>
+          <button
+            id="tabChart"
+            class="view-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panelChart"
+            disabled
+          >
+            Chart
+          </button>
+          <button
+            id="tabExplain"
+            class="view-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panelExplain"
+            disabled
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+              <path d="M12 11v5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <circle cx="12" cy="8" r="1.2" fill="currentColor" />
+            </svg>
+            Explain
+          </button>
+          <button
+            id="tabCode"
+            class="view-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panelCode"
+            disabled
+          >
+            <span aria-hidden="true">&lt;/&gt;</span> Code
+          </button>
+        </div>
+      </div>
+
+      <div class="results-body">
+        <div id="successBar" class="success-bar hidden" role="status">
+          <span class="success-bar-icon" aria-hidden="true">✓</span>
+          <span id="successSummary" class="success-bar-text"></span>
+          <div class="success-bar-actions">
+            <span id="elapsedLabel" class="elapsed-label"></span>
+            <button id="exportReportBtn" class="btn btn-export" type="button" disabled>
+              Export report
+            </button>
+          </div>
+        </div>
+
+        <div id="errorBox" class="alert alert-error hidden" role="alert"></div>
+
+        <div id="queryProgress" class="query-progress hidden" aria-hidden="true">
+          <div class="query-progress-head">
+            <span class="query-progress-spinner" aria-hidden="true"></span>
+            <span class="query-progress-title">QueryMind is thinking…</span>
+          </div>
+          <ol class="query-progress-steps">
+            <li class="qp-step" data-step="understand">
+              <span class="qp-dot" aria-hidden="true"></span>Understanding your question
+            </li>
+            <li class="qp-step" data-step="generate">
+              <span class="qp-dot" aria-hidden="true"></span>Generating analysis code
+            </li>
+            <li class="qp-step" data-step="run">
+              <span class="qp-dot" aria-hidden="true"></span>Running on the live dataset
+            </li>
+            <li class="qp-step" data-step="render">
+              <span class="qp-dot" aria-hidden="true"></span>Building your results
+            </li>
+          </ol>
+        </div>
+
+        <div id="emptyState" class="results-empty">
+          <div class="results-empty-inner">
+            <div class="results-empty-icon" aria-hidden="true">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+                <path
+                  d="M20 20l-3.5-3.5"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </div>
+            <h3 class="results-empty-title">Ask anything about your wells</h3>
+            <p class="results-empty-lead">
+              Type a plain-English question or pick an example. QueryMind generates analytics code,
+              runs it live, and shows results here.
+            </p>
+            <ul class="results-empty-tags" aria-label="What you get after running a query">
+              <li>Data table</li>
+              <li>Auto chart</li>
+              <li>Full code</li>
+              <li>CSV export</li>
+              <li>Trend analysis</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="panelTable" class="result-panel hidden" role="tabpanel">
+          <div id="resultTableWrap" class="table-wrap"></div>
+        </div>
+
+        <div id="panelChart" class="result-panel hidden" role="tabpanel">
+          <div id="chartNoData" class="chart-placeholder hidden">
+            <p>No chart available for this result. Try the Table or Code view.</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="resultChart"></canvas>
+          </div>
+        </div>
+
+        <div id="panelExplain" class="result-panel hidden" role="tabpanel">
+          <div class="explain-meta">
+            <span id="confidenceBadge" class="confidence-badge confidence-badge--loading">
+              <span class="confidence-dot" aria-hidden="true"></span>
+              <span id="confidenceText">Analyzing…</span>
+            </span>
+            <span id="explainSource" class="explain-source"></span>
+          </div>
+
+          <div class="explain-callout" id="explainSummaryCard">
+            <div class="explain-callout-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.5.4.8 1 .9 1.6h5.2c.1-.6.4-1.2.9-1.6A6 6 0 0012 3z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <div class="explain-callout-body">
+              <p class="explain-callout-label">What this query does</p>
+              <p id="explainSummary" class="explain-callout-text">
+                <span class="skeleton-line"></span>
+                <span class="skeleton-line skeleton-line--short"></span>
+              </p>
+            </div>
+          </div>
+
+          <div class="explain-block">
+            <p class="explain-block-label">Assumptions made</p>
+            <div id="explainAssumptions" class="assumption-grid">
+              <div class="assumption-card assumption-card--ghost"></div>
+              <div class="assumption-card assumption-card--ghost"></div>
+              <div class="assumption-card assumption-card--ghost"></div>
+            </div>
+          </div>
+
+          <div class="explain-block">
+            <p class="explain-block-label">Execution steps</p>
+            <ol id="explainSteps" class="step-list">
+              <li class="step-item step-item--ghost"><span class="skeleton-line"></span></li>
+              <li class="step-item step-item--ghost"><span class="skeleton-line"></span></li>
+              <li class="step-item step-item--ghost"><span class="skeleton-line"></span></li>
+            </ol>
+          </div>
+        </div>
+
+        <div id="panelCode" class="result-panel hidden" role="tabpanel">
+          <div class="code-toolbar">
+            <button id="exportCodeBtn" class="btn btn-secondary-sm" type="button" disabled>
+              Export code
+            </button>
+            <a class="text-btn" href="/export/template">CSV template</a>
+          </div>
+          <pre class="code-block"><code id="codeOutput" class="language-python"></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar sidebar--rest" aria-label="Examples and history">
+      <div class="sidebar-panel">
+        <section class="sidebar-section sidebar-section--compact">
+          <h2 class="section-title">Example questions</h2>
+          <div id="exampleChips" class="chips chips--scroll">
+            <button class="chip" type="button">Highest production by field last quarter</button>
+            <button class="chip" type="button">Monthly Permian Basin trend for 2024</button>
+            <button class="chip" type="button">Top 5 wells by total production</button>
+            <button class="chip" type="button">Operator comparison — all fields</button>
+            <button class="chip" type="button">Bakken wells below 10,000 ft depth</button>
+            <button class="chip" type="button">Production decline analysis by month</button>
+          </div>
+        </section>
+
+        <section class="sidebar-section sidebar-section--grow">
+          <div class="section-head">
+            <h2 class="section-title">Recent queries</h2>
+            <button id="clearHistoryBtn" class="text-btn" type="button">Clear</button>
+          </div>
+          <ul id="historyList" class="history-list">
+            <li class="history-empty">No recent queries yet. Your history will appear here.</li>
+          </ul>
+        </section>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart-inference.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}

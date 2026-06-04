@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% set active_page = "schema" %}
+{% block title %}Schema Explorer — QueryMind{% endblock %}
+{% block body_class %}page-schema{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <header class="content-header">
+    <div class="content-header-icon" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+        <ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" stroke-width="2" />
+        <path
+          d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"
+          stroke="currentColor"
+          stroke-width="2"
+        />
+      </svg>
+    </div>
+    <div>
+      <h1>Schema Explorer</h1>
+      <p class="content-subtitle">
+        Inspect the underlying table powering QueryMind. Click any column to use it in a question.
+      </p>
+    </div>
+  </header>
+
+  <section class="query-block" aria-label="Executed query">
+    <div class="query-block-head">
+      <span class="query-block-label">Executed query</span>
+      <button id="copySchemaQueryBtn" class="btn btn-copy" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2" />
+          <path
+            d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v10a2 2 0 002 2h2"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+        </svg>
+        Copy
+      </button>
+    </div>
+    <pre class="query-block-code" id="schemaQueryText"></pre>
+  </section>
+
+  <section class="schema-panel" aria-labelledby="schema-table-heading">
+    <div class="schema-panel-head">
+      <h2 id="schema-table-heading" class="schema-panel-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2" />
+          <path d="M3 10h18M8 5v14" stroke="currentColor" stroke-width="2" />
+        </svg>
+        <span id="schemaTableName"></span>
+      </h2>
+      <span class="schema-panel-meta" id="schemaMeta"></span>
+    </div>
+    <div class="schema-table-wrap">
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th scope="col">Col name</th>
+            <th scope="col">Data type</th>
+            <th scope="col">Comment</th>
+          </tr>
+        </thead>
+        <tbody id="schemaColumnsBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sample-section" aria-labelledby="sample-heading">
+    <h2 id="sample-heading" class="sample-heading">Sample rows (first 5)</h2>
+    <div class="sample-table-wrap">
+      <table class="data-table" id="sampleRowsTable">
+        <thead id="sampleRowsHead"></thead>
+        <tbody id="sampleRowsBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p id="schemaError" class="page-error hidden" role="alert"></p>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/schema.js') }}"></script>
+{% endblock %}

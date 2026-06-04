@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+{% block title %}Production Dashboard — QueryMind{% endblock %}
+{% block body_class %}page-dashboard{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <header class="content-header">
+    <div class="content-header-icon" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+        <path
+          d="M4 20V10M10 20V4M16 20v-8M22 20V8"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+    </div>
+    <div>
+      <h1>Production Dashboard</h1>
+      <p class="content-subtitle" id="dashboardSubtitle">
+        Pre-built KPIs across all wells in your dataset.
+      </p>
+    </div>
+  </header>
+
+  <div class="kpi-grid" id="kpiGrid">
+    <article class="kpi-card">
+      <span class="kpi-card-icon kpi-card-icon--blue" aria-hidden="true">↻</span>
+      <p class="kpi-label">Total Wells</p>
+      <p class="kpi-value" id="kpiWells"></p>
+      <p class="kpi-detail" id="kpiRecords"></p>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-card-icon kpi-card-icon--green" aria-hidden="true">↗</span>
+      <p class="kpi-label">Avg Monthly Production</p>
+      <p class="kpi-value" id="kpiAvgMonthly"></p>
+      <p class="kpi-detail" id="kpiTotalProd"></p>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-card-icon kpi-card-icon--red" aria-hidden="true">★</span>
+      <p class="kpi-label">Top Field</p>
+      <p class="kpi-value" id="kpiTopField"></p>
+      <p class="kpi-detail" id="kpiTopFieldVol"></p>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-card-icon kpi-card-icon--purple" aria-hidden="true">▤</span>
+      <p class="kpi-label">Top Operator</p>
+      <p class="kpi-value" id="kpiTopOperator"></p>
+      <p class="kpi-detail" id="kpiTopOperatorVol"></p>
+    </article>
+  </div>
+
+  <section class="chart-card chart-card--wide" aria-labelledby="trend-heading">
+    <h2 id="trend-heading" class="chart-card-title">Monthly production trend</h2>
+    <div class="chart-card-body">
+      <canvas id="trendChart" aria-label="Monthly production trend chart"></canvas>
+    </div>
+  </section>
+
+  <div class="chart-row">
+    <section class="chart-card" aria-labelledby="field-heading">
+      <h2 id="field-heading" class="chart-card-title">Production by field</h2>
+      <div class="chart-card-body chart-card-body--short">
+        <canvas id="fieldChart" aria-label="Production by field"></canvas>
+      </div>
+    </section>
+    <section class="chart-card" aria-labelledby="operator-heading">
+      <h2 id="operator-heading" class="chart-card-title">Production by operator</h2>
+      <div class="chart-card-body chart-card-body--short">
+        <canvas id="operatorChart" aria-label="Production by operator"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <p id="dashboardError" class="page-error hidden" role="alert"></p>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

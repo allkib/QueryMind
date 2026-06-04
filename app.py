@@ -7,18 +7,26 @@ from typing import Any, Dict
 
 from flask import Flask, jsonify, render_template, request, send_file
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
 from executor import (
-    databricks_healthcheck,
-    ensure_warehouse_running,
+    clear_databricks_health_cache,
+    get_databricks_health,
     get_executor_mode,
-    get_warehouse_state,
 )
-from data_io import import_wells_csv, result_to_csv_bytes
+from data_io import import_wells_csv, result_to_csv_bytes, result_to_workbook_bytes
 from history import clear_history, get_history, init_db, save_history
-from prompts import generate_with_retry
-from schema import get_dataset_stats, get_schema
+from prompts import explain_query, generate_with_retry
+from schema import (
+    clear_page_data_cache,
+    get_dashboard_data,
+    get_dataset_stats,
+    get_schema,
+    get_schema_page_data,
+    get_table_name,
+)
 
 load_dotenv(override=True)
 init_db()
@@ -63,11 +71,69 @@ def create_app() -> Flask:
     app = Flask(__name__)
     CORS(app)
 
+    # General-purpose rate limiting. Defaults apply to every route; the
+    # LLM-backed and upload routes get tighter per-route limits below. Uses an
+    # in-memory store by default; set RATELIMIT_STORAGE_URI (e.g. redis://...)
+    # for multi-process deployments behind gunicorn.
+    limiter = Limiter(
+        key_func=get_remote_address,
+        app=app,
+        default_limits=["240 per hour", "60 per minute"],
+        storage_uri=os.getenv("RATELIMIT_STORAGE_URI", "memory://"),
+        strategy="fixed-window",
+        headers_enabled=True,
+    )
+
+    @app.errorhandler(429)
+    def ratelimit_handler(error: Any) -> Any:
+        return (
+            jsonify(
+                {
+                    "error": "Rate limit exceeded. Please slow down and try again shortly.",
+                    "detail": str(getattr(error, "description", "")),
+                    "result": None,
+                    "code": "",
+                }
+            ),
+            429,
+        )
+
     @app.route("/", methods=["GET"])
-    def index() -> Any:
-        return render_template("index.html")
+    def home() -> Any:
+        return render_template(
+            "home.html",
+            active_page="home",
+            table_name=get_table_name(),
+        )
+
+    @app.route("/workspace", methods=["GET"])
+    def workspace() -> Any:
+        return render_template("workspace.html", active_page="workspace")
+
+    @app.route("/dashboard", methods=["GET"])
+    def dashboard() -> Any:
+        return render_template("dashboard.html", active_page="dashboard")
+
+    @app.route("/schema", methods=["GET"])
+    def schema_page() -> Any:
+        return render_template("schema.html", active_page="schema")
+
+    @app.route("/dashboard/data", methods=["GET"])
+    def dashboard_data() -> Any:
+        try:
+            return jsonify({"ok": True, **get_dashboard_data()})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.route("/schema/info", methods=["GET"])
+    def schema_info() -> Any:
+        try:
+            return jsonify({"ok": True, **get_schema_page_data()})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
 
     @app.route("/query", methods=["POST"])
+    @limiter.limit("12 per minute;120 per hour")
     def query() -> Any:
         payload: Dict[str, Any] = request.get_json(force=True) or {}
         question = (payload.get("question") or "").strip()
@@ -107,6 +173,7 @@ def create_app() -> Flask:
             elapsed_ms = int((time.perf_counter() - started) * 1000)
             response_result = _json_safe_result(exec_result)
             save_history(question, code, response_result, success=True)
+            row_count = len((response_result or {}).get("rows", []))
             return jsonify(
                 {
                     "code": code,
@@ -115,10 +182,13 @@ def create_app() -> Flask:
                     "retry_count": retry_count,
                     "attempts": retry_count + 1,
                     "elapsed_ms": elapsed_ms,
+                    "result_row_count": row_count,
                 }
             )
         except Exception as e:
             err_msg = str(e)
+            if get_executor_mode() == "databricks":
+                clear_databricks_health_cache()
             save_history(question, code, None, success=False, error=err_msg)
             return (
                 jsonify(
@@ -133,11 +203,58 @@ def create_app() -> Flask:
                 500,
             )
 
+    @app.route("/explain", methods=["POST"])
+    @limiter.limit("20 per minute;200 per hour")
+    def explain() -> Any:
+        payload: Dict[str, Any] = request.get_json(force=True) or {}
+        question = (payload.get("question") or "").strip()
+        code = (payload.get("code") or "").strip()
+        if not question or not code:
+            return (
+                jsonify({"ok": False, "error": "Missing 'question' or 'code'."}),
+                400,
+            )
+
+        result_columns = payload.get("result_columns") or []
+        if not isinstance(result_columns, list):
+            result_columns = []
+        result_rows = payload.get("result_row_count")
+        try:
+            result_rows = int(result_rows) if result_rows is not None else None
+        except (TypeError, ValueError):
+            result_rows = None
+
+        try:
+            schema = get_schema()
+        except Exception as e:
+            return jsonify({"ok": False, "error": f"Failed to load schema: {e}"}), 500
+
+        input_rows: int | None = None
+        try:
+            input_rows = int(get_dataset_stats().get("row_count"))
+        except Exception:
+            input_rows = None
+
+        try:
+            explanation = explain_query(
+                question,
+                code,
+                schema,
+                input_rows=input_rows,
+                result_rows=result_rows,
+                result_columns=[str(c) for c in result_columns],
+            )
+            return jsonify({"ok": True, "explanation": explanation})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
     @app.route("/import/csv", methods=["POST"])
+    @limiter.limit("10 per minute")
     def import_csv() -> Any:
         upload = request.files.get("file")
         try:
             info = import_wells_csv(upload)
+            clear_page_data_cache()
             mode = get_executor_mode()
             message = f"Imported {info['rows']:,} rows into local dataset."
             if mode == "databricks":
@@ -168,6 +285,24 @@ def create_app() -> Flask:
             download_name="querymind-results.csv",
         )
 
+    @app.route("/export/xlsx", methods=["POST"])
+    @limiter.limit("30 per minute")
+    def export_xlsx() -> Any:
+        payload: Dict[str, Any] = request.get_json(force=True) or {}
+        try:
+            xlsx_bytes = result_to_workbook_bytes(payload)
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+
+        buffer = io.BytesIO(xlsx_bytes)
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name="querymind-report.xlsx",
+        )
+
     @app.route("/export/template", methods=["GET"])
     def export_template() -> Any:
         from schema import DATA_PATH
@@ -196,6 +331,7 @@ def create_app() -> Flask:
         return jsonify({"ok": True})
 
     @app.route("/dataset/stats", methods=["GET"])
+    @limiter.exempt
     def dataset_stats() -> Any:
         try:
             stats = get_dataset_stats()
@@ -204,6 +340,7 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": str(e)}), 500
 
     @app.route("/health", methods=["GET"])
+    @limiter.exempt
     def health() -> Any:
         mode = get_executor_mode()
         databricks_configured = bool(
@@ -220,6 +357,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/health/databricks", methods=["GET"])
+    @limiter.exempt
     def health_databricks() -> Any:
         mode = get_executor_mode()
         if mode != "databricks":
@@ -234,11 +372,13 @@ def create_app() -> Flask:
                 200,
             )
 
+        probe = request.args.get("probe", "light")
+        if probe not in ("light", "full"):
+            probe = "light"
+        force = request.args.get("force", "").lower() in ("1", "true", "yes")
+
         try:
-            warehouse_state = str(get_warehouse_state().get("state", "UNKNOWN"))
-            if warehouse_state != "RUNNING":
-                ensure_warehouse_running()
-            health = databricks_healthcheck()
+            health = get_databricks_health(probe=probe, use_cache=True, force=force)
             return jsonify(
                 {
                     "ok": True,
@@ -247,18 +387,15 @@ def create_app() -> Flask:
                 }
             )
         except Exception as e:
-            warehouse_state = "UNKNOWN"
-            try:
-                warehouse_state = str(get_warehouse_state().get("state", "UNKNOWN"))
-            except Exception:
-                pass
+            clear_databricks_health_cache()
             return (
                 jsonify(
                     {
                         "ok": False,
                         "mode": mode,
-                        "warehouse_state": warehouse_state,
+                        "warehouse_state": "UNKNOWN",
                         "error": str(e),
+                        "probe": probe,
                     }
                 ),
                 503,

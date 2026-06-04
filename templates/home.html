@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% set active_page = "home" %}
+{% block title %}QueryMind — Energy Analytics{% endblock %}
+{% block body_class %}page-home{% endblock %}
+
+{% block content %}
+<main class="landing">
+  <!-- Hero -->
+  <section class="hero" data-reveal>
+    <div class="hero-bg" aria-hidden="true">
+      <span class="hero-orb hero-orb--blue"></span>
+      <span class="hero-orb hero-orb--gold"></span>
+      <span class="hero-grid"></span>
+    </div>
+    <div class="hero-inner">
+      <p class="hero-badge">
+        <span class="hero-badge-dot" aria-hidden="true"></span>
+        AI-POWERED · ENERGY ANALYTICS
+      </p>
+      <h1 class="hero-title">
+        Ask your well data <span class="hero-title-accent">in plain English.</span>
+      </h1>
+      <p class="hero-lead">
+        QueryMind turns natural-language questions into auditable PySpark and SQL — instant
+        production analytics, no SQL skills and no waiting on the data team.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-lg" href="/workspace">
+          Open Workspace
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M5 12h14M13 6l6 6-6 6"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </a>
+        <a class="btn btn-secondary btn-lg" href="/dashboard">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M4 20V10M10 20V4M16 20v-8M22 20V8"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+          View Dashboard
+        </a>
+      </div>
+
+      <dl class="hero-stats" id="heroStats" aria-label="Live dataset overview">
+        <div class="hero-stat">
+          <dt>Production records</dt>
+          <dd data-qm-stat="rows">—</dd>
+        </div>
+        <div class="hero-stat">
+          <dt>Wells tracked</dt>
+          <dd data-qm-stat="wells">—</dd>
+        </div>
+        <div class="hero-stat">
+          <dt>Fields</dt>
+          <dd data-qm-stat="fields">—</dd>
+        </div>
+        <div class="hero-stat">
+          <dt>Operators</dt>
+          <dd data-qm-stat="operators">—</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="landing-section" data-reveal aria-labelledby="how-heading">
+    <div class="section-intro">
+      <p class="section-eyebrow">How it works</p>
+      <h2 id="how-heading" class="section-title-lg display-serif">
+        From question to insight in three steps
+      </h2>
+    </div>
+    <ol class="steps-row">
+      <li class="step-card">
+        <span class="step-index">01</span>
+        <h3>Ask in plain English</h3>
+        <p>Type a question the way you'd ask a colleague — no syntax, schemas, or joins required.</p>
+      </li>
+      <li class="step-card">
+        <span class="step-index">02</span>
+        <h3>QueryMind writes the code</h3>
+        <p>The engine inspects your live schema and generates auditable PySpark / SQL, then runs it.</p>
+      </li>
+      <li class="step-card">
+        <span class="step-index">03</span>
+        <h3>See results &amp; reasoning</h3>
+        <p>Get a table, an auto-built chart, a plain-English explanation, and a one-click export.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- Try a question -->
+  <section class="try-card" data-reveal aria-labelledby="try-heading">
+    <div class="try-card-head">
+      <h2 id="try-heading" class="try-card-label">Try one of these questions</h2>
+      <span class="try-card-arrow" aria-hidden="true">→</span>
+    </div>
+    <ul class="try-queries">
+      <li>
+        <a class="try-query" href="/workspace?q=Highest+production+by+field+last+quarter">
+          Highest production by field last quarter
+          <span class="try-query-arrow" aria-hidden="true">→</span>
+        </a>
+      </li>
+      <li>
+        <a class="try-query" href="/workspace?q=Top+5+wells+by+total+production">
+          Top 5 wells by total production
+          <span class="try-query-arrow" aria-hidden="true">→</span>
+        </a>
+      </li>
+      <li>
+        <a class="try-query" href="/workspace?q=Monthly+Permian+trend+for+2024">
+          Monthly Permian trend for 2024
+          <span class="try-query-arrow" aria-hidden="true">→</span>
+        </a>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Capabilities -->
+  <section class="landing-section" data-reveal aria-labelledby="cap-heading">
+    <div class="section-intro">
+      <p class="section-eyebrow">Capabilities</p>
+      <h2 id="cap-heading" class="section-title-lg display-serif">
+        Built for production analytics teams
+      </h2>
+    </div>
+    <div class="feature-grid" aria-label="Platform features">
+      <article class="feature-card">
+        <div class="feature-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" stroke-width="2" />
+            <path
+              d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+          </svg>
+        </div>
+        <h3>Live data platform</h3>
+        <p id="featureDataBlurb">
+          Connected to your wells table with production records across multiple fields.
+        </p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </div>
+        <h3>Auditable code</h3>
+        <p>
+          Every result ships with the generated PySpark and SQL — review, edit, or export.
+        </p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M4 20V10M10 20V4M16 20v-8M22 20V8"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </div>
+        <h3>Auto-charting</h3>
+        <p>Line, bar, pie, and scatter charts pick themselves from your question and result shape.</p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+            <path d="M12 11v5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <circle cx="12" cy="8" r="1.2" fill="currentColor" />
+          </svg>
+        </div>
+        <h3>Explains itself</h3>
+        <p>A plain-English breakdown of assumptions, filters, and steps behind every answer.</p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 3l7 4v5c0 4.4-3 7.8-7 9-4-1.2-7-4.6-7-9V7l7-4z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <h3>Self-healing retries</h3>
+        <p>Failed code is auto-corrected up to 3× from the live error — analysts never see flaky runs.</p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <h3>Excel &amp; CSV export</h3>
+        <p>Ship a polished workbook — data, the chart, and the code — to any stakeholder in one click.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Closing CTA -->
+  <section class="cta-band" data-reveal>
+    <div class="cta-band-inner">
+      <h2 class="cta-title display-serif">Put your production data within reach of every team.</h2>
+      <p class="cta-lead">
+        Open the workspace and ask your first question — results, charts, and code in seconds.
+      </p>
+      <a class="btn btn-gold btn-lg" href="/workspace">
+        Launch QueryMind
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M5 12h14M13 6l6 6-6 6"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </a>
+    </div>
+  </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>
+{% endblock %}
