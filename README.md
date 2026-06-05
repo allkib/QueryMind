@@ -94,8 +94,9 @@ QueryMind/
 ├── static/css/         # style.css (app + design system), pages.css (landing)
 ├── static/js/          # app, dashboard, schema, home, common, data-cache,
 │                       #   chart-inference, auth, tour
+├── databricks/         # Scheduled SQL to grow the wells table over time
 ├── scripts/deploy-azure.sh
-├── docs/DEPLOY-AZURE.md
+├── docs/               # DEPLOY-AZURE.md, DATABRICKS-SAMPLE-DATA.md
 ├── Dockerfile / .dockerignore
 └── requirements.txt
 ```
@@ -194,6 +195,18 @@ On Apple Silicon the script builds **linux/amd64** images (required by App
 Service). It pushes to ACR, ensures a Linux plan, deploys the container with
 `WEBSITES_PORT=8000`, grants the web app **AcrPull**, and applies app settings
 from `.env`. Multiple apps can share one plan at no extra cost.
+
+---
+
+## Keeping the dataset fresh (optional)
+
+In Databricks mode, a scheduled SQL job can grow the `wells` table **every hour**
+so the Dashboard and Workspace stay alive automatically. The SQL is schema-driven
+(no new columns) and date-capped so inserted months **never surpass the current
+real date**; the primary job adds a new well each run, with an optional backfill
+that fills history up to today. On **Databricks Free Edition this is free** —
+serverless, no billing, just a fair-usage quota. Setup, scheduling, and cost
+notes: **[docs/DATABRICKS-SAMPLE-DATA.md](./docs/DATABRICKS-SAMPLE-DATA.md)**.
 
 ---
 
