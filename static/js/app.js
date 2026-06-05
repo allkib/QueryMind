@@ -1,3 +1,16 @@
+/**
+ * Workspace controller — the heart of the interactive query UI.
+ *
+ * Owns the full question -> result lifecycle: sends the question to POST /query,
+ * drives the progress stepper, renders the result as a table / auto-inferred
+ * Chart.js chart / generated code, lazily fetches the plain-English explanation
+ * from /explain, and handles the Excel report export. Also wires example chips,
+ * recent-history, and the ?q= deep link from the landing page.
+ *
+ * Kept as a single vanilla-JS file (no build step / framework) on purpose: the
+ * app is small, and shipping plain scripts keeps the Flask + Jinja stack simple
+ * to run and deploy.
+ */
 let chartInstance = null;
 let activeView = "chart";
 let lastQueryStart = null;

@@ -1,3 +1,21 @@
+"""
+Safe execution of LLM-generated analysis code, in two interchangeable modes.
+
+Mode is chosen by the ``EXECUTOR`` env var:
+
+- ``local`` (default): runs generated **pandas** code via ``exec`` inside a
+  hardened sandbox — an allow-listed ``__builtins__``, only ``df``/``pd``/``np``
+  in scope, blocked imports/IO/network, and a 500-row output cap. Generated code
+  is untrusted, so this layer is the primary safety boundary.
+- ``databricks``: sends generated **SQL** to a Databricks SQL warehouse over the
+  Statements REST API (no server-side ``exec``), auto-starting the warehouse and
+  enforcing SELECT-only queries.
+
+Every Databricks call is wrapped in a hard timeout (``_run_with_timeout``) so a
+stalled warehouse can never hang a request thread, and health probes are cached
+to keep page navigations from repeatedly waking the warehouse.
+"""
+
 from __future__ import annotations
 
 import math
@@ -23,10 +41,17 @@ _health_cache_at: float = 0.0
 
 
 def get_executor_mode() -> str:
+    """Return the active execution backend: ``"local"`` or ``"databricks"``."""
     return os.getenv("EXECUTOR", "local").lower()
 
 
 def _run_with_timeout(fn: Callable[[], T], timeout_sec: int, label: str) -> T:
+    """Run ``fn`` on a worker thread, raising a helpful error if it overruns.
+
+    Used to bound Databricks REST calls: ``future.result(timeout=...)`` lets us
+    abandon a stuck warehouse connection instead of blocking the request thread
+    indefinitely.
+    """
     pool = ThreadPoolExecutor(max_workers=1)
     future = pool.submit(fn)
     try:
@@ -43,9 +68,12 @@ def _run_with_timeout(fn: Callable[[], T], timeout_sec: int, label: str) -> T:
 
 
 class UnsafeCodeError(RuntimeError):
-    pass
+    """Raised when generated code contains a disallowed import or token."""
 
 
+# Substrings that must never appear in generated local code. This is a coarse
+# but deliberate defense-in-depth check on top of the restricted builtins —
+# blocking file IO, process spawning, dynamic eval, and any network egress.
 FORBIDDEN_TOKENS = [
     " open(",
     "open(",
@@ -66,6 +94,7 @@ ALLOWED_IMPORT_LINES = {
 
 
 def _validate_code_safety(code: str) -> None:
+    """Reject generated code that imports anything beyond pandas/numpy or uses a forbidden token."""
     for raw_line in code.splitlines():
         line = raw_line.strip()
         if line.startswith("import ") or line.startswith("from "):

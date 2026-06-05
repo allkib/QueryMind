@@ -1,3 +1,24 @@
+"""
+Prompt templates and the LLM-driven code-generation pipeline.
+
+This is the "brain" of QueryMind. It holds the system prompts for both backends
+(pandas and Databricks SQL), talks to the Duke LiteLLM gateway through the
+OpenAI-compatible client, and exposes three entry points:
+
+- ``generate_with_retry`` — the agentic loop: generate code, execute it, and on
+  failure feed the *exact* execution error back to the model to repair it (up to
+  ``MAX_QUERY_RETRIES`` times). This self-healing is what makes a single-shot LLM
+  reliable enough for non-technical users.
+- ``explain_query`` — a separate, lower-stakes call that narrates what a query did
+  for a business reader, returning structured JSON with a deterministic fallback
+  so the Explain tab always renders even if the model is down or returns garbage.
+
+Design choices worth noting: temperature is pinned to 0 for deterministic,
+reproducible code; the prompts forbid markdown fences and ``print`` so output is
+directly executable; and model responses are defensively de-fenced and JSON-
+extracted because gateways occasionally wrap output despite instructions.
+"""
+
 from __future__ import annotations
 
 import json
@@ -143,6 +164,7 @@ FIX_PROMPT_DATABRICKS_SQL = dedent(
 
 
 def _get_client() -> OpenAI:
+    """Build an OpenAI-compatible client pointed at the Duke LiteLLM gateway."""
     api_key = os.getenv("DUKE_API_KEY")
     if not api_key:
         raise RuntimeError("DUKE_API_KEY is not set in the environment.")
@@ -154,6 +176,7 @@ def _get_client() -> OpenAI:
 
 
 def _strip_code_fences(code: str) -> str:
+    """Remove ```python/```sql markdown fences a model may add despite instructions."""
     cleaned = code.strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.lstrip("`")
@@ -166,6 +189,11 @@ def _strip_code_fences(code: str) -> str:
 
 
 def _llm_completion(system_prompt: str, user_prompt: str) -> str:
+    """Single chat completion at temperature 0, returned de-fenced.
+
+    Temperature 0 keeps generated code deterministic so the same question yields
+    the same query — important for a tool whose output users audit and trust.
+    """
     client = _get_client()
     response = client.chat.completions.create(
         model=os.getenv("LLM_MODEL", "gpt-5.5"),

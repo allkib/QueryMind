@@ -6,4 +6,5 @@ __pycache__/
 query_history.db
 *.db
 .DS_Store
+**/.DS_Store
 

@@ -1,3 +1,20 @@
+"""
+Flask application factory and HTTP API for QueryMind.
+
+This module wires together the four building blocks of the app and keeps the
+routes intentionally thin — all real work lives in the supporting modules:
+
+- ``prompts``   — turns a question + schema into executable code (LLM, with retry)
+- ``executor``  — runs that code safely (sandboxed pandas locally, or Databricks SQL)
+- ``schema``    — describes the dataset for the LLM and powers the schema/dashboard pages
+- ``history``   — persists each query to SQLite for the "recent queries" sidebar
+
+Responses are always JSON for the ``/query``, ``/explain``, and data endpoints so the
+vanilla-JS frontend can render tables, charts, and explanations without templating
+round-trips. Values are passed through ``_json_safe_*`` first because pandas/numpy
+emit types (NaN, Timestamp, numpy scalars) that the stdlib JSON encoder rejects.
+"""
+
 import io
 import os
 import math
@@ -33,6 +50,12 @@ init_db()
 
 
 def _json_safe_value(value: Any) -> Any:
+    """Coerce a single value into something the stdlib JSON encoder accepts.
+
+    Handles the awkward types that show up in query results: NaN/inf floats
+    (which are invalid JSON) become ``None``, dates become ISO strings, and any
+    leftover pandas/numpy object falls back to ``str``.
+    """
     if value is None:
         return None
     if isinstance(value, bool | int | str):
@@ -58,6 +81,7 @@ def _json_safe_value(value: Any) -> Any:
 
 
 def _json_safe_result(exec_result: Any) -> Dict[str, Any] | None:
+    """Convert an executor DataFrame into a ``{columns, rows}`` JSON payload."""
     if exec_result is None:
         return None
 
@@ -68,6 +92,13 @@ def _json_safe_result(exec_result: Any) -> Dict[str, Any] | None:
 
 
 def create_app() -> Flask:
+    """Build and configure the Flask app (factory pattern).
+
+    Using a factory keeps construction side-effect-free and importable for tests,
+    and lets the WSGI entrypoint (``app = create_app()``) and gunicorn share one
+    code path. CORS is enabled so the JSON API can be consumed from a separate
+    frontend host if the project is ever split.
+    """
     app = Flask(__name__)
     CORS(app)
 
@@ -135,6 +166,13 @@ def create_app() -> Flask:
     @app.route("/query", methods=["POST"])
     @limiter.limit("12 per minute;120 per hour")
     def query() -> Any:
+        """Core endpoint: natural-language question -> generated code -> result.
+
+        Body: ``{"question": "..."}``. Loads the live schema, asks the LLM to
+        generate code (retrying against execution errors), runs it, and returns
+        the code, a JSON-safe result, timing, and retry count. Tightly rate
+        limited because every call hits the LLM and (in cloud mode) Databricks.
+        """
         payload: Dict[str, Any] = request.get_json(force=True) or {}
         question = (payload.get("question") or "").strip()
         if not question:
@@ -206,6 +244,13 @@ def create_app() -> Flask:
     @app.route("/explain", methods=["POST"])
     @limiter.limit("20 per minute;200 per hour")
     def explain() -> Any:
+        """Produce a plain-English explanation of an already-run query.
+
+        Called asynchronously by the workspace after a result loads, so the
+        explanation never blocks the main query response. Degrades gracefully to
+        a deterministic explanation if the LLM is unavailable (see
+        ``prompts.explain_query``).
+        """
         payload: Dict[str, Any] = request.get_json(force=True) or {}
         question = (payload.get("question") or "").strip()
         code = (payload.get("code") or "").strip()
@@ -288,6 +333,7 @@ def create_app() -> Flask:
     @app.route("/export/xlsx", methods=["POST"])
     @limiter.limit("30 per minute")
     def export_xlsx() -> Any:
+        """Build and stream a multi-sheet Excel report (data, chart, code)."""
         payload: Dict[str, Any] = request.get_json(force=True) or {}
         try:
             xlsx_bytes = result_to_workbook_bytes(payload)

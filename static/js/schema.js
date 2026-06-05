@@ -1,3 +1,11 @@
+/**
+ * Schema Explorer page.
+ *
+ * Renders the dataset's column definitions and sample rows from GET /schema/info
+ * (served from cache in common/data-cache.js when warm). Columns are clickable:
+ * selecting one deep-links into the workspace with a starter question, nudging
+ * non-technical users toward valid queries.
+ */
 function escapeHtml(value) {
   return window.QueryMind?.escapeHtml(value) ?? String(value);
 }

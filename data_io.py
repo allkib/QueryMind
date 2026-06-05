@@ -1,3 +1,19 @@
+"""
+Import and export helpers for the wells dataset and query results.
+
+Covers three flows:
+
+- ``import_wells_csv`` — validates an uploaded CSV against the expected schema
+  (required columns, numeric coercion, row cap) before it replaces the local
+  dataset, so a malformed upload can never poison later queries.
+- ``result_to_csv_bytes`` — the simple CSV download of a result table.
+- ``result_to_workbook_bytes`` — a richer, multi-sheet ``.xlsx`` report bundling
+  the question/metadata, the data, the rendered chart image, and the generated
+  code, so a non-technical stakeholder gets a self-contained, auditable artifact
+  from one click. ``openpyxl`` is imported lazily inside that function to keep
+  the common import path light.
+"""
+
 from __future__ import annotations
 
 import base64

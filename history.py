@@ -1,3 +1,17 @@
+"""
+Lightweight SQLite log of every query, powering the "recent queries" sidebar.
+
+SQLite was chosen deliberately: it is zero-config, file-based, and ships with
+Python, which fits a single-instance demo/portfolio app far better than running
+a separate database server. Each call records the question, generated code, a
+short human-readable result preview, and success/failure — enough to repopulate
+the sidebar and demonstrate the agentic retry loop without storing full results.
+
+Note: in a multi-process gunicorn deployment this file-backed log is per-instance;
+swapping ``DB_PATH`` for a shared database would be the upgrade path if history
+ever needs to be global.
+"""
+
 from __future__ import annotations
 
 import sqlite3
@@ -9,6 +23,7 @@ DB_PATH = Path(__file__).parent / "query_history.db"
 
 
 def init_db() -> None:
+    """Create the ``query_log`` table if it does not exist (idempotent)."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
@@ -26,6 +41,7 @@ def init_db() -> None:
 
 
 def _result_preview(result: Optional[Dict[str, Any]], error: Optional[str]) -> str:
+    """Build a short (<=240 char) human-readable summary of a result for the sidebar."""
     if error:
         return error[:240]
     if not result:
@@ -49,6 +65,7 @@ def save_history(
     success: bool,
     error: Optional[str] = None,
 ) -> None:
+    """Persist one query attempt (success or failure) to the log."""
     init_db()
     preview = _result_preview(result, error)
     ts = datetime.now(timezone.utc).isoformat()
@@ -65,6 +82,7 @@ def save_history(
 
 
 def get_history(limit: int = 10) -> List[Dict[str, Any]]:
+    """Return the most recent queries, newest first (limit clamped to 1-50)."""
     init_db()
     limit = max(1, min(int(limit), 50))
 
@@ -94,6 +112,7 @@ def get_history(limit: int = 10) -> List[Dict[str, Any]]:
 
 
 def clear_history() -> None:
+    """Delete all rows from the query log (the sidebar "Clear" action)."""
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("DELETE FROM query_log")

@@ -1,3 +1,22 @@
+"""
+Dataset description and read-only analytics that feed the LLM and the UI.
+
+Two responsibilities live here, both mode-aware (local CSV vs. Databricks):
+
+1. ``get_schema`` builds the natural-language schema string injected into the
+   LLM prompt. Crucially it includes the **distinct values** of low-cardinality
+   categorical columns (field, operator) so the model filters on values that
+   actually exist (e.g. "Permian", not "Permian Basin") — the single biggest
+   cause of empty results before this was added.
+2. ``get_dataset_stats`` / ``get_schema_page_data`` / ``get_dashboard_data``
+   compute the numbers behind the header badges, Schema Explorer, and Dashboard
+   without going through the LLM.
+
+All page payloads are memoized with a short TTL (``_cached_page_data``) and
+explicitly invalidated on CSV import, since recomputing dashboard aggregates on
+every navigation is wasteful and, in Databricks mode, slow.
+"""
+
 from __future__ import annotations
 
 import os
@@ -152,13 +171,6 @@ def _categorical_values_databricks(table: str) -> dict[str, list[str]]:
             # Distinct lookup is best-effort; skip on any failure.
             continue
     return out
-
-
-def _load_schema_dataframe_from_databricks() -> pd.DataFrame:
-    from executor import _execute_databricks_sql
-
-    table = get_table_name()
-    return _execute_databricks_sql(f"SELECT * FROM {table} LIMIT 2")
 
 
 def _format_schema(

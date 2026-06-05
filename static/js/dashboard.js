@@ -1,3 +1,11 @@
+/**
+ * Dashboard page — renders pre-built KPIs and Chart.js visuals.
+ *
+ * Pulls one aggregated payload from GET /dashboard/data (computed server-side in
+ * schema.py, in whichever executor mode is active) and paints the KPI cards plus
+ * the monthly-trend, by-field, and by-operator charts. No LLM involved — these
+ * are deterministic summaries so the page loads instantly and consistently.
+ */
 const NAVY = "#0a2540";
 const BLUE = "#0066b2";
 const BLUE_FILL = "rgba(0, 102, 178, 0.18)";

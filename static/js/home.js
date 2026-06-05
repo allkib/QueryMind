@@ -1,3 +1,11 @@
+/**
+ * Landing page enhancements.
+ *
+ * Two small jobs: fill the "Live data platform" blurb with real dataset stats
+ * (so the marketing copy reflects the actual connected data), and run the
+ * scroll-reveal animations via IntersectionObserver — with graceful fallbacks
+ * for reduced-motion preferences and browsers without the observer.
+ */
 (function () {
   const featureBlurb = document.getElementById("featureDataBlurb");
 
